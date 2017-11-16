@@ -2,6 +2,8 @@ import os
 import sys
 import pickle
 
+import pandas as pd
+
 import pysam
 
 import logging
@@ -13,8 +15,11 @@ logging.basicConfig(
 so do my codes"""
 
 
-def extract_barcode(query_name):
-    return query_name.split('_')[-1]
+def extract_barcode(query_name, lib_id=None):
+    bc = query_name.split('_')[-1]
+    if lib_id is not None:
+        bc += '-{0}'.format(lib_id)
+    return bc
 
 
 def update_info(old, new):
@@ -43,45 +48,78 @@ def pass_qc(sam_record):
     )
 
 
-def gen_cov_table(input_bam):
-    logging.info('reading {0}'.format(input_bam))
-    infile = pysam.AlignmentFile(input_bam)
+def get_lib_id(input_bam, dd):
+    for k in dd.keys():
+        if k in input_bam:
+            return dd[k]
 
+
+def gen_cov_table(input_bams, lib_id_dd=None):
+    """lib_id: library id, used to disambiguate barcodes from different
+    libraries"""
     results = {}
-    logging.info('looping {0}'.format(input_bam))
-    for k, rec in enumerate(infile):
-        if (k + 1) % 1000000 == 0:
-            logging.info('processed {0} records'.format(k + 1))
+    total_counts = 0
+    for ibam in input_bams:
+        logging.info('reading {0}'.format(ibam))
+        infile = pysam.AlignmentFile(ibam)
+        lib_id = get_lib_id(ibam, lib_id_dd)
+        logging.info('found lib_id: {0}'.format(lib_id))
 
-        if not pass_qc(rec):
-            continue
+        for k, rec in enumerate(infile):
+            if not pass_qc(rec):
+                continue
 
-        ref_name = rec.reference_name
-        bc = extract_barcode(rec.query_name)
+            ref_name = rec.reference_name
+            bc = extract_barcode(rec.query_name, lib_id)
 
-        info = gen_info_tuple(rec)
+            info = gen_info_tuple(rec)
 
-        ref_dd = results.get(ref_name)
-        if ref_dd is None:
-            results[ref_name] = {bc: info}
-        else:
-            old_tuple = ref_dd.get(bc)
-            if old_tuple is None:
-                ref_dd[bc] = info
+            ref_dd = results.get(ref_name)
+            if ref_dd is None:
+                results[ref_name] = {bc: info}
             else:
-                ref_dd[bc] = update_info(ref_dd[bc], info)
-    logging.info('looping finished'.format(input_bam))
+                old_tuple = ref_dd.get(bc)
+                if old_tuple is None:
+                    ref_dd[bc] = info
+                else:
+                    ref_dd[bc] = update_info(ref_dd[bc], info)
+            total_counts += 1
+            if (k + 1) % 1000000 == 0:
+                logging.info(
+                    'processed {0} records from {1}, {2} in total'.format(
+                        k + 1, ibam, total_counts))
+        logging.info('finished parsing {0}'.format(ibam))
+
+        infile.close()
+    logging.info(
+        'processed {0} records in total from {1} bam files'.format(
+            total_counts, len(input_bams)))
     return results
 
 
+# def calc_cov(cov_table):
+#     """cov_table is a dictionary of dictionaries"""
+#     for ref_name in cov_table.keys():
+#         for bc in cov_table[ref_name].values():
+
 def write_results(results, output):
+    logging.info('dumping results to {0}'.format(output))
     with open(output, 'wb') as opf:
         pickle.dump(results, opf)
 
 
 if __name__ == "__main__":
-    infile_name = sys.argv[1]
+    in_bams = list(sorted(sys.argv[1:]))
+    out_dir = './spruce'
     out_pkl = os.path.join(
-        os.path.dirname(infile_name),
-        os.path.basename(infile_name).rstrip('.bam') + '.cov-table.pkl'
+        out_dir,
+        'cov-table.pkl'
     )
+
+    lib_id_df = df = pd.read_csv('/projects/spruceup_scratch/psitchensis/Q903/assembly/scaffolding/ARCS/post-LINKS_3-ABySS-Assemblies/alignments/libraries.tsv', sep='\t')
+    lib_id_dd = dict(df.values)
+
+    # for i in in_bams:
+    #     print(i, get_lib_id(i, lib_id_dd))
+    res = gen_cov_table(in_bams, lib_id_dd)
+    write_results(res, out_pkl)
