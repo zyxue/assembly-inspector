@@ -29,7 +29,7 @@ re_pattern = re.compile(r'\sSN:({0})\s'.format('|'.join(list(refs))))
 with open(input_sam, 'rt') as inf:
     with open(output_sam, 'wt') as opf:
         for k, line in enumerate(inf):
-            if (k + 1) % 5000 == 0:
+            if (k + 1) % 1000000 == 0:
                 logging.info('processed {0} lines'.format(k + 1))
             if (line.startswith('@SQ') and not re_pattern.search(line)):
                 continue
