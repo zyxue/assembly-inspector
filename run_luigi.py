@@ -9,47 +9,8 @@ import h5py
 import luigi
 
 
-# class SelectLongestContigs(luigi.Task):
-#     in_fai = luigi.Parameter()
-#     top_n = luigi.IntParameter(default=3)
-#     out_dir = luigi.Parameter()
-
-#     def requires(self):
-#         return []
-
-#     def output(self):
-#         return luigi.LocalTarget(
-#             os.path.join(self.out_dir,
-#                          'top_{0}_longest_contigs.csv'.format(self.top_n)))
-
-#     def run(self):
-#         # for format of fai: http://www.htslib.org/doc/faidx.html
-#         df_len = pd.read_csv(
-#             self.in_fai, sep='\t', header=None,
-#             usecols=[0, 1], dtype={0: str, 1: np.uint})
-#         df_len.columns = ['ref_name', 'len']
-#         df_len.sort_values('len', ascending=False, inplace=True)
-#         df_len.head(self.top_n).to_csv(self.output().fn, index=False)
-
-
 def zprint(s, *a, **ka):
     print('*' * 10 + str(s), *a, **ka)
-
-
-def gen_contig_length_dict_from_fai(fai, contigs):
-    res = {}
-    contigs = set(contigs)
-    count = 0
-    target = len(contigs)
-    with open(fai, 'rt') as inf:
-        for line in inf:
-            ref_name, contig_len = line.split('\t')[:2]
-            if ref_name in contigs:
-                res[ref_name] = int(contig_len)
-                count += 1
-                if count == target:  # no need to loop through the whole file
-                    break
-    return res
 
 
 class FilterBam(luigi.Task):
@@ -100,6 +61,22 @@ class FilterAndMergeBamsFromSameLibrary(luigi.Task):
         subprocess.call(cmd, shell=True, executable="/bin/bash")
 
 
+def gen_contig_length_dict_from_fai(fai, contigs):
+    res = {}
+    contigs = set(contigs)
+    count = 0
+    target = len(contigs)
+    with open(fai, 'rt') as inf:
+        for line in inf:
+            ref_name, contig_len = line.split('\t')[:2]
+            if ref_name in contigs:
+                res[ref_name] = int(contig_len)
+                count += 1
+                if count == target:  # no need to loop through the whole file
+                    break
+    return res
+
+
 class CalculateCoveragesForBamsFromSameLibrary(luigi.Task):
     """
     Calculate both barcode and read coverages and store them in hdf5
@@ -133,15 +110,6 @@ class CalculateCoveragesForBamsFromSameLibrary(luigi.Task):
             contig_len_dd,
             self.output().fn
         )
-
-        # cmd = './scripts/calc_bc_span.py {out_csv} {lib_id} {in_bam}'.format(
-        #     out_csv=self.output().fn, lib_id=self.lib_id, in_bam=self.input().fn
-        # )
-        # zprint(cmd)
-        # subprocess.call(cmd, shell=True, executable="/bin/bash")
-
-        # calculate bc coverage
-        # calculate read coverage
 
 
 class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.WrapperTask):
