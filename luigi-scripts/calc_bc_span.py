@@ -21,7 +21,7 @@ def extract_barcode(query_name, lib_id=None):
     return bc
 
 
-def update_info(old, new):
+def update_span(old, new):
     """be functional, yey!"""
     return (
         min(old[0], new[0]),
@@ -30,7 +30,7 @@ def update_info(old, new):
     )
 
 
-def gen_info_tuple(rec):
+def gen_span_tuple(rec):
     return (
         rec.reference_start,
         rec.reference_end,
@@ -47,13 +47,13 @@ def pass_qc(sam_record):
     )
 
 
-def get_lib_id(input_bam, dd):
-    for k in dd.keys():
-        if k in input_bam:
-            return dd[k]
+# def get_lib_id(input_bam, dd):
+#     for k in dd.keys():
+#         if k in input_bam:
+#             return dd[k]
 
 
-def gen_cov_table(input_bams, lib_id_dd=None):
+def gen_cov_table(input_bams, lib_id=''):
     """lib_id: library id, used to disambiguate barcodes from different
     libraries"""
     results = {}
@@ -61,8 +61,6 @@ def gen_cov_table(input_bams, lib_id_dd=None):
     for ibam in input_bams:
         logging.info('reading {0}'.format(ibam))
         infile = pysam.AlignmentFile(ibam)
-        lib_id = get_lib_id(ibam, lib_id_dd)
-        logging.info('found lib_id: {0}'.format(lib_id))
 
         for k, rec in enumerate(infile):
             if not pass_qc(rec):
@@ -71,17 +69,17 @@ def gen_cov_table(input_bams, lib_id_dd=None):
             ref_name = rec.reference_name
             bc = extract_barcode(rec.query_name, lib_id)
 
-            info = gen_info_tuple(rec)
+            span = gen_span_tuple(rec)
 
             ref_dd = results.get(ref_name)
             if ref_dd is None:
-                results[ref_name] = {bc: info}
+                results[ref_name] = {bc: span}
             else:
                 old_tuple = ref_dd.get(bc)
                 if old_tuple is None:
-                    ref_dd[bc] = info
+                    ref_dd[bc] = span
                 else:
-                    ref_dd[bc] = update_info(ref_dd[bc], info)
+                    ref_dd[bc] = update_span(ref_dd[bc], span)
             total_counts += 1
             if (k + 1) % 1000000 == 0:
                 logging.info(
