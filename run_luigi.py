@@ -30,8 +30,25 @@ import luigi
 #         df_len.sort_values('len', ascending=False, inplace=True)
 #         df_len.head(self.top_n).to_csv(self.output().fn, index=False)
 
+
 def zprint(s, *a, **ka):
-    print('*' * 10 + s, *a, **ka)
+    print('*' * 10 + str(s), *a, **ka)
+
+
+def gen_contig_length_dict_from_fai(fai, contigs):
+    res = {}
+    contigs = set(contigs)
+    count = 0
+    target = len(contigs)
+    with open(fai, 'rt') as inf:
+        for line in inf:
+            ref_name, contig_len = line.split('\t')[:2]
+            if ref_name in contigs:
+                res[ref_name] = int(contig_len)
+                count += 1
+                if count == target:  # no need to loop through the whole file
+                    break
+    return res
 
 
 class FilterBam(luigi.Task):
@@ -84,27 +101,79 @@ class FilterAndMergeBamsFromSameLibrary(luigi.Task):
 
 class CalculateCoverages(luigi.Task):
     """
-    Calculate both barcode and read coverages
+    Calculate both barcode and read coverages and store them in hdf5
     """
-    grouped_bams = luigi.DictParameter()  # {lib_id: [1.bam, 2.bam]}
+    lib_id = luigi.Parameter()
+    bams = luigi.ListParameter()  # {lib_id: [1.bam, 2.bam]}
     contigs = luigi.ListParameter()
-    fai = luigi.Parameter()     # fa index, used for calculate contig length
     out_dir = luigi.Parameter()
+    fai = luigi.Parameter()     # fa index, used for calculate contig length
 
     def requires(self):
-        for lib_id in self.grouped_bams:
-            bams = self.grouped_bams[lib_id]
-            yield FilterAndMergeBamsFromSameLibrary(
-                lib_id=lib_id,
-                bams=bams,
-                contigs=self.contigs,
-                out_dir=self.out_dir)
+        return FilterAndMergeBamsFromSameLibrary(
+            lib_id=self.lib_id,
+            bams=self.bams,
+            contigs=self.contigs,
+            out_dir=self.out_dir
+        )
+
+    def output(self):
+        # bc_span_csv = os.path.join(self.out_dir, '{0}.bc_span.csv'.format(self.lib_id))
+        cov_h5 = os.path.join(self.out_dir, '{0}.h5'.format(self.lib_id))
+        return luigi.LocalTarget(cov_h5)
 
     def run(self):
-        print([_.fn for _ in self.input()])
+        from calc_cov import gen_barcode_and_read_cov
+
+        contig_len_dd = gen_contig_length_dict_from_fai(self.fai, self.contigs)
+        gen_barcode_and_read_cov(
+            self.input().fn,
+            self.lib_id,
+            contig_len_dd,
+            self.output().fn
+        )
+
+        # cmd = './scripts/calc_bc_span.py {out_csv} {lib_id} {in_bam}'.format(
+        #     out_csv=self.output().fn, lib_id=self.lib_id, in_bam=self.input().fn
+        # )
+        # zprint(cmd)
+        # subprocess.call(cmd, shell=True, executable="/bin/bash")
+
         # calculate bc coverage
         # calculate read coverage
-        pass
+
+
+
+
+# class CalculateCoverages(luigi.Task):
+#     """
+#     Calculate both barcode and read coverages
+#     """
+#     grouped_bams = luigi.DictParameter()  # {lib_id: [1.bam, 2.bam]}
+#     contigs = luigi.ListParameter()
+#     fai = luigi.Parameter()     # fa index, used for calculate contig length
+#     out_dir = luigi.Parameter()
+
+#     def requires(self):
+#         for lib_id in self.grouped_bams:
+#             bams = self.grouped_bams[lib_id]
+#             yield FilterAndMergeBamsFromSameLibrary(
+#                 lib_id=lib_id,
+#                 bams=bams,
+#                 contigs=self.contigs,
+#                 out_dir=self.out_dir)
+
+#     def output(self):
+#         return [
+#             luigi.LocalTarget(os.path.join(self.out_dir, '{0}.csv)'.format(lib_id)))
+#             for lib_id in self.grouped_bams
+#         ]
+            
+#     def run(self):
+#         print([_.fn for _ in self.input()])
+#         # calculate bc coverage
+#         # calculate read coverage
+#         pass
 
 
 
