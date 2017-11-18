@@ -1,3 +1,14 @@
+# Setup
+
+```
+virtualenv venv
+source venv/bin
+pip install -r requirements.txt
+
+# start luigi scheduler, listening at 8082 by default
+luigid
+```
+
 # Example commands
 
 ```
