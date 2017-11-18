@@ -5,6 +5,7 @@ import itertools
 
 import numpy as np
 import pandas as pd
+import h5py
 import luigi
 
 
@@ -99,7 +100,7 @@ class FilterAndMergeBamsFromSameLibrary(luigi.Task):
         subprocess.call(cmd, shell=True, executable="/bin/bash")
 
 
-class CalculateCoverages(luigi.Task):
+class CalculateCoveragesForBamsFromSameLibrary(luigi.Task):
     """
     Calculate both barcode and read coverages and store them in hdf5
     """
@@ -143,39 +144,57 @@ class CalculateCoverages(luigi.Task):
         # calculate read coverage
 
 
+class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.WrapperTask):
+    """
+    Calculate both barcode and read coverages
+    """
+    grouped_bams = luigi.DictParameter()  # {lib_id: [1.bam, 2.bam]}
+    contigs = luigi.ListParameter()
+    out_dir = luigi.Parameter()
+    fai = luigi.Parameter()     # fa index, used for calculate contig length
 
+    def requires(self):
+        for lib_id in self.grouped_bams:
+            bams = self.grouped_bams[lib_id]
+            yield CalculateCoveragesForBamsFromSameLibrary(
+                lib_id=lib_id,
+                bams=bams,
+                contigs=self.contigs,
+                out_dir=self.out_dir,
+                fai=self.fai
+            )
 
-# class CalculateCoverages(luigi.Task):
-#     """
-#     Calculate both barcode and read coverages
-#     """
-#     grouped_bams = luigi.DictParameter()  # {lib_id: [1.bam, 2.bam]}
-#     contigs = luigi.ListParameter()
-#     fai = luigi.Parameter()     # fa index, used for calculate contig length
-#     out_dir = luigi.Parameter()
+    def output(self):
+        return luigi.LocalTarget(os.path.join(self.out_dir, 'total.h5)'))
 
-#     def requires(self):
-#         for lib_id in self.grouped_bams:
-#             bams = self.grouped_bams[lib_id]
-#             yield FilterAndMergeBamsFromSameLibrary(
-#                 lib_id=lib_id,
-#                 bams=bams,
-#                 contigs=self.contigs,
-#                 out_dir=self.out_dir)
+    def run(self):
+        ind_h5_dd = {}          # ind: individual
+        for i in self.input():
+            ind_h5_dd[i] = h5py.File(i, 'r')
 
-#     def output(self):
-#         return [
-#             luigi.LocalTarget(os.path.join(self.out_dir, '{0}.csv)'.format(lib_id)))
-#             for lib_id in self.grouped_bams
-#         ]
-            
-#     def run(self):
-#         print([_.fn for _ in self.input()])
-#         # calculate bc coverage
-#         # calculate read coverage
-#         pass
+        with open(self.output(), 'w') as opf:
+            for rn in self.contigs:
+                total_rc, total_bc = None, None
+                rc_key = '{0}/rc'.format(rn)
+                bc_key = '{0}/bc'.format(rn)
+                for i in self.input():
+                    # update read coverage
+                    if total_rc is None:
+                        total_rc = ind_h5_dd[i][rc_key]
+                    else:
+                        total_rc += ind_h5_dd[i][rc_key]
 
+                    # update barcode coverage
+                    if total_bc is None:
+                        total_bc = ind_h5_dd[i][bc_key]
+                    else:
+                        total_bc += ind_h5_dd[i][bc_key]
 
+                opf.create_dataset(rc_key, data=total_rc)
+                opf.create_dataset(bc_key, data=total_bc)
+
+        for i in self.input():
+            ind_h5_dd[i].close()
 
 if __name__ == '__main__':
     luigi.run()
