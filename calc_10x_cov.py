@@ -1,8 +1,7 @@
-import os
-import sys
-import pickle
+#!/usr/bin/env python
 
-import pandas as pd
+import sys
+import csv
 
 import pysam
 
@@ -97,29 +96,28 @@ def gen_cov_table(input_bams, lib_id_dd=None):
     return results
 
 
-# def calc_cov(cov_table):
-#     """cov_table is a dictionary of dictionaries"""
-#     for ref_name in cov_table.keys():
-#         for bc in cov_table[ref_name].values():
-
 def write_results(results, output):
-    logging.info('dumping results to {0}'.format(output))
-    with open(output, 'wb') as opf:
-        pickle.dump(results, opf)
+    logging.info('writing results to {0}'.format(output))
+
+    with open(output, 'wt') as opf:
+        csvwriter = csv.writer(opf, delimiter='\t')
+        total_contigs = len(results.keys())
+        for ck, (contig, val_dd) in enumerate(results.items()):
+            for (bc, values) in val_dd.items():
+                if lib_id:
+                    bc += '-{0}'.format(lib_id)
+                csvwriter.writerow([contig, bc] + list(values))
+            if (ck + 1) % 100000 == 0:
+                logging.info('processed {0}/{1} ({2:.2%})'.format(
+                    ck + 1, total_contigs, (ck + 1) / total_contigs))
+        logging.info('processed {0}/{1} ({2:.2%})'.format(
+            ck + 1, total_contigs, (ck + 1) / total_contigs))
 
 
 if __name__ == "__main__":
-    in_bams = list(sorted(sys.argv[1:]))
-    out_dir = './spruce'
-    out_pkl = os.path.join(
-        out_dir,
-        'cov-table.pkl'
-    )
+    out_csv = sys.argv[1]
+    lib_id = sys.argv[2]
+    in_bams = list(sorted(sys.argv[3:]))  # e.g. from the same library
 
-    lib_id_df = df = pd.read_csv('/projects/spruceup_scratch/psitchensis/Q903/assembly/scaffolding/ARCS/post-LINKS_3-ABySS-Assemblies/alignments/libraries.tsv', sep='\t')
-    lib_id_dd = dict(df.values)
-
-    # for i in in_bams:
-    #     print(i, get_lib_id(i, lib_id_dd))
-    res = gen_cov_table(in_bams, lib_id_dd)
-    write_results(res, out_pkl)
+    res = gen_cov_table(in_bams, lib_id)
+    write_results(res, out_csv)
