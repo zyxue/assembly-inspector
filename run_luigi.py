@@ -112,7 +112,7 @@ class CalculateCoveragesForBamsFromSameLibrary(luigi.Task):
         )
 
 
-class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.WrapperTask):
+class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.Task):
     """
     Calculate both barcode and read coverages
     """
@@ -133,14 +133,14 @@ class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.WrapperTask):
             )
 
     def output(self):
-        return luigi.LocalTarget(os.path.join(self.out_dir, 'total.h5)'))
+        return luigi.LocalTarget(os.path.join(self.out_dir, 'total.h5'))
 
     def run(self):
         ind_h5_dd = {}          # ind: individual
         for i in self.input():
-            ind_h5_dd[i] = h5py.File(i, 'r')
+            ind_h5_dd[i.fn] = h5py.File(i.fn, 'r')
 
-        with open(self.output(), 'w') as opf:
+        with h5py.File(self.output().fn, 'w') as opf:
             for rn in self.contigs:
                 total_rc, total_bc = None, None
                 rc_key = '{0}/rc'.format(rn)
@@ -148,21 +148,21 @@ class CalcAndSumCoveragesForGroupedBamsFromMultiLibraries(luigi.WrapperTask):
                 for i in self.input():
                     # update read coverage
                     if total_rc is None:
-                        total_rc = ind_h5_dd[i][rc_key]
+                        total_rc = ind_h5_dd[i.fn][rc_key].value
                     else:
-                        total_rc += ind_h5_dd[i][rc_key]
+                        total_rc += ind_h5_dd[i.fn][rc_key].value
 
                     # update barcode coverage
                     if total_bc is None:
-                        total_bc = ind_h5_dd[i][bc_key]
+                        total_bc = ind_h5_dd[i.fn][bc_key].value
                     else:
-                        total_bc += ind_h5_dd[i][bc_key]
+                        total_bc += ind_h5_dd[i.fn][bc_key].value
 
                 opf.create_dataset(rc_key, data=total_rc)
                 opf.create_dataset(bc_key, data=total_bc)
 
         for i in self.input():
-            ind_h5_dd[i].close()
+            ind_h5_dd[i.fn].close()
 
 if __name__ == '__main__':
     luigi.run()
