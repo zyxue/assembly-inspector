@@ -23,8 +23,8 @@ class FilterBam(luigi.Task):
     def output(self):
         # out_path = os.path.join(self.out_dir, out_fn)
 
-        out_fn = '{0}.filtered.bam'.format(
-            os.path.basename(self.bam).rstrip('.bam'))
+        out_fn = '{0}.{1}-contigs.bam'.format(
+            os.path.basename(self.bam).rstrip('.bam'), len(self.contigs))
         out_path = os.path.join(os.path.dirname(self.bam), out_fn)
         return luigi.LocalTarget(out_path)
 
