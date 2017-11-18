@@ -50,13 +50,15 @@ class FilterAndMergeBamsFromSameLibrary(luigi.Task):
 
     def output(self):
         return luigi.LocalTarget(os.path.join(
-            self.out_dir, '{0}.filtered.merged.bam'.format(self.lib_id)))
+            self.out_dir, '{0}.filtered.merged.sorte-by-index.bam'.format(self.lib_id)))
 
     def run(self):
-        cmd = 'samtools merge {out_bam} {in_bams}'.format(
+        # merge doesn't guarrantee continuous chromosomes, so have to sort, too
+        cmd = 'samtools merge - {in_bams} | samtools sort -o {out_bam}'.format(
             out_bam=self.output().fn,
             in_bams=' '.join([_.fn for _ in self.input()]),
         )
+
         zprint(cmd)
         subprocess.call(cmd, shell=True, executable="/bin/bash")
 
