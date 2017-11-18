@@ -99,12 +99,12 @@ def gen_barcode_and_read_cov(input_bam, lib_id, contig_len_dd, out_h5):
         else:
             if curr_rn != rn:
                 # write rc_arr to h5
-                h5_writer.create_dataset("{0}/rc".format(rn), data=rc_arr)
+                h5_writer.create_dataset("{0}/rc".format(curr_rn), data=rc_arr)
 
                 # fillup bc_arr from info in bc_span_dd
                 for (bc, (span_beg, span_end, _)) in bc_span_dd.items():
                     bc_arr[span_beg:span_end] += 1
-                h5_writer.create_dataset("{0}/bc".format(rn), data=bc_arr)
+                h5_writer.create_dataset("{0}/bc".format(curr_rn), data=bc_arr)
 
                 num_parsed_contigs += 1
 
@@ -129,12 +129,12 @@ def gen_barcode_and_read_cov(input_bam, lib_id, contig_len_dd, out_h5):
                 'processed {0} records from {1}'.format(k + 1, input_bam))
 
     # write rc_arr to h5
-    h5_writer.create_dataset("{0}/rc".format(rn), data=rc_arr)
+    h5_writer.create_dataset("{0}/rc".format(curr_rn), data=rc_arr)
 
     # fillup bc_arr from info in bc_span_dd
     for (bc, (span_beg, span_end, _)) in bc_span_dd.items():
         bc_arr[span_beg:span_end] += 1
-    h5_writer.create_dataset("{0}/bc".format(rn), data=bc_arr)
+    h5_writer.create_dataset("{0}/bc".format(curr_rn), data=bc_arr)
 
     num_parsed_contigs += 1
 
