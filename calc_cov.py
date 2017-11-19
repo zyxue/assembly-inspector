@@ -9,7 +9,7 @@ import pysam
 
 import logging
 logging.basicConfig(
-    level=logging.DEBUG, format='%(asctime)s|%(levelname)s|%(message)s')
+    level=logging.INFO, format='%(asctime)s|%(levelname)s|%(message)s')
 
 
 """SAM is 1-based while BAM is 0-based, pysam always follow python convention,
