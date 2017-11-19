@@ -47,14 +47,14 @@ def parse_bam_record(rec):
     return rn, beg, end
 
 
-# def pass_qc(sam_record):
-#     """pass quality check or not"""
-#     rec = sam_record
-#     return not (
-#         rec.reference_id == -1
-#         or rec.mapping_quality == 0
-#         or rec.reference_end is None  # this could be a result of MAPQ=0
-#     )
+def pass_qc(sam_record):
+    """pass quality check or not"""
+    rec = sam_record
+    return not (
+        rec.reference_id == -1
+        or rec.reference_end is None  # read is unmapped or no cigar alignment
+        # or rec.mapping_quality == 0
+    )
 
 
 # def get_lib_id(input_bam, dd):
@@ -82,8 +82,8 @@ def gen_barcode_and_read_cov(input_bam, lib_id, contig_len_dd, out_h5):
     h5_writer = h5py.File(out_h5, "w")
 
     for k, rec in enumerate(infile):
-        # if not pass_qc(rec):
-        #     continue
+        if not pass_qc(rec):
+            continue
         rn, beg, end = parse_bam_record(rec)
 
         # process barcode span
