@@ -38,7 +38,7 @@ class FilterBam(luigi.Task):
         subprocess.call(cmd, shell=True, executable="/bin/bash")
 
 
-class FilterAndMergeBamsFromSameLibrary(luigi.Task):
+class MergeBamsFromSameLibrary(luigi.Task):
     lib_id = luigi.Parameter()
     bams = luigi.ListParameter()
     contigs = luigi.ListParameter()
@@ -90,7 +90,7 @@ class CalculateCoveragesForBamsFromSameLibrary(luigi.Task):
     fai = luigi.Parameter()     # fa index, used for calculate contig length
 
     def requires(self):
-        return FilterAndMergeBamsFromSameLibrary(
+        return MergeBamsFromSameLibrary(
             lib_id=self.lib_id,
             bams=self.bams,
             contigs=self.contigs,
